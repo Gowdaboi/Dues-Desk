@@ -62,35 +62,45 @@ function EditableCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function save() {
     if (draft === value) {
       setEditing(false);
       return;
     }
+    setError(null);
     startTransition(async () => {
-      await updateInvoiceField(invoiceId, field, draft);
-      setEditing(false);
+      try {
+        await updateInvoiceField(invoiceId, field, draft);
+        setEditing(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Update failed");
+      }
     });
   }
 
   if (editing) {
     return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") save();
-          if (e.key === "Escape") {
-            setDraft(value);
-            setEditing(false);
-          }
-        }}
-        disabled={pending}
-        className="w-full rounded border border-border bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-accent"
-      />
+      <div>
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") {
+              setDraft(value);
+              setEditing(false);
+              setError(null);
+            }
+          }}
+          disabled={pending}
+          className="w-full rounded border border-border bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-accent"
+        />
+        {error && <p className="mt-0.5 text-[11px] text-destructive">{error}</p>}
+      </div>
     );
   }
 
@@ -99,11 +109,12 @@ function EditableCell({
       onClick={() => {
         setDraft(value);
         setEditing(true);
+        setError(null);
       }}
       className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-muted"
       title="Click to edit"
     >
-      {escapeText(value) || " "}
+      {escapeText(value) || " "}
     </span>
   );
 }
@@ -116,6 +127,7 @@ function StatusDropdown({
   currentStatus: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleChange(newStatus: string) {
     if (newStatus === currentStatus) return;
@@ -127,24 +139,32 @@ function StatusDropdown({
       promisedDate = dateStr;
     }
 
+    setError(null);
     startTransition(async () => {
-      await changeInvoiceStatus(invoiceId, currentStatus, newStatus, promisedDate);
+      try {
+        await changeInvoiceStatus(invoiceId, currentStatus, newStatus, promisedDate);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Status change failed");
+      }
     });
   }
 
   return (
-    <select
-      value={currentStatus}
-      onChange={(e) => handleChange(e.target.value)}
-      disabled={pending}
-      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[currentStatus] ?? ""} border-none outline-none cursor-pointer`}
-    >
-      {STATUS_OPTIONS.map((s) => (
-        <option key={s} value={s}>
-          {s}
-        </option>
-      ))}
-    </select>
+    <div>
+      <select
+        value={currentStatus}
+        onChange={(e) => handleChange(e.target.value)}
+        disabled={pending}
+        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[currentStatus] ?? ""} border-none outline-none cursor-pointer`}
+      >
+        {STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      {error && <p className="mt-0.5 text-[11px] text-destructive">{error}</p>}
+    </div>
   );
 }
 

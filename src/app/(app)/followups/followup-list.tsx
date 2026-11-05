@@ -55,21 +55,32 @@ function FollowupCard({ followup, isDueToday, today }: { followup: Followup; isD
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(followup.message_text);
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function saveMessage() {
     if (draft === followup.message_text) {
       setEditing(false);
       return;
     }
+    setError(null);
     startTransition(async () => {
-      await updateFollowupMessage(followup.id, draft);
-      setEditing(false);
+      try {
+        await updateFollowupMessage(followup.id, draft);
+        setEditing(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Save failed");
+      }
     });
   }
 
   function handleStatus(status: "approved" | "skipped" | "sent") {
+    setError(null);
     startTransition(async () => {
-      await updateFollowupStatus(followup.id, status);
+      try {
+        await updateFollowupStatus(followup.id, status);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Status change failed");
+      }
     });
   }
 
@@ -212,6 +223,7 @@ function FollowupCard({ followup, isDueToday, today }: { followup: Followup; isD
           </a>
         )}
       </div>
+      {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
     </div>
   );
 }

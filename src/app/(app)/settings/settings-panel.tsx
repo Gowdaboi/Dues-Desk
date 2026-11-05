@@ -29,6 +29,7 @@ export function SettingsPanel({
 }) {
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   if (!workspace) {
@@ -38,17 +39,23 @@ export function SettingsPanel({
           No workspace yet. Create one to get started.
         </p>
         <button
-          onClick={() =>
+          onClick={() => {
+            setError(null);
             startTransition(async () => {
-              await ensureWorkspace();
-              router.refresh();
-            })
-          }
+              try {
+                await ensureWorkspace();
+                router.refresh();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to create workspace");
+              }
+            });
+          }}
           disabled={pending}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Creating..." : "Create Workspace"}
         </button>
+        {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
       </div>
     );
   }
@@ -63,9 +70,14 @@ export function SettingsPanel({
 
   function handleRotate() {
     if (!confirm("Rotate token? Your current MCP URL will stop working.")) return;
+    setError(null);
     startTransition(async () => {
-      await rotateToken();
-      router.refresh();
+      try {
+        await rotateToken();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to rotate token");
+      }
     });
   }
 
@@ -74,9 +86,14 @@ export function SettingsPanel({
       return;
     if (demoMode && !confirm("Are you sure? This resets demo data for everyone."))
       return;
+    setError(null);
     startTransition(async () => {
-      await resetDemoData();
-      router.refresh();
+      try {
+        await resetDemoData();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to reset data");
+      }
     });
   }
 
@@ -113,6 +130,7 @@ export function SettingsPanel({
           >
             {pending ? "Rotating..." : "Rotate Token"}
           </button>
+          {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
         </div>
       )}
 
@@ -128,6 +146,7 @@ export function SettingsPanel({
         >
           {pending ? "Resetting..." : "Reset All Data"}
         </button>
+        {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
       </div>
     </div>
   );
