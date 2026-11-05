@@ -4,9 +4,30 @@ A collections follow-up desk for Indian SMEs. Paste overdue invoices into Claude
 
 ## Architecture
 
-- **Next.js 16** App Router + Supabase (Postgres + Auth)
-- **MCP server** at `/api/mcp/[token]` — 5 tools Claude calls to read invoices, create follow-ups, and update statuses
-- **No AI/LLM packages inside the app** — Claude writes every message externally; the app only stores and serves
+```
+┌─────────────────────────────────────────────────────┐
+│  Claude (external — writes every message)           │
+│  ┌────────────────────────────────────────────┐     │
+│  │  MCP Connector (Streamable HTTP, stateless) │     │
+│  └──────────────────┬─────────────────────────┘     │
+│                     │ JSON-RPC over HTTPS            │
+│  ┌──────────────────▼─────────────────────────┐     │
+│  │  Next.js 16 App Router (Vercel)            │     │
+│  │  /api/mcp/[token]  ← 7 MCP tools          │     │
+│  │  /api/health       ← daily cron heartbeat  │     │
+│  │  /(app)/*          ← dashboard, invoices,  │     │
+│  │                       follow-ups, settings  │     │
+│  └──────────────────┬─────────────────────────┘     │
+│                     │                                │
+│  ┌──────────────────▼─────────────────────────┐     │
+│  │  Supabase (Postgres + Auth + RLS)          │     │
+│  │  Tables: workspaces, invoices, followups,   │     │
+│  │          events                             │     │
+│  └────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────┘
+```
+
+**No AI inside.** There are zero LLM packages, API keys, or server-side text generation in this codebase. Claude writes every follow-up message externally via MCP; the app only stores and serves what Claude produces.
 
 ## Getting Started
 
@@ -24,36 +45,54 @@ NEXT_PUBLIC_SUPABASE_URL=<your Supabase project URL>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service-role key>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+CRON_SECRET=<random string for /api/health auth>
+```
+
+For production (Vercel), also set:
+
+```
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app   (no trailing slash)
+DEMO_MODE=true                                        (hides token rotation, adds reset confirmation)
+CRON_SECRET=<same random string>
 ```
 
 > **Never commit real keys or tokens to the repo.**
 
 ## Connect to Claude
 
-1. Open Claude and go to **Settings > Connectors** (or **Customize > Connectors** on claude.ai).
-2. Click **Add custom connector**.
-3. Paste your MCP Server URL (find it on the Settings page of Dues Desk after signing in).
-4. Choose **"No sign in"** as the authentication method.
-5. Save.
+1. Sign in to Dues Desk and go to **Settings** to find your MCP URL.
+2. In Claude, open **Settings > Connectors** (or **Customize > Connectors** on claude.ai).
+3. Click **Add custom connector**, paste the URL, and choose **"No sign in"**.
+4. Save. On Team/Enterprise plans, an Owner adds the connector from the workspace admin panel first.
 
-On **Team or Enterprise** plans, an Owner must add the connector from the workspace admin panel before members can use it.
+> **Do not share your MCP URL publicly.** It contains a secret token that grants full access to your workspace data. Rotate it from Settings if compromised.
 
-> **Do not share your MCP URL publicly.** It contains a secret token that grants full access to your workspace data. If compromised, rotate it from Settings.
-
-## MCP Tools
+## MCP Tools (7)
 
 Once connected, Claude has access to these tools:
 
 | Tool | Description |
 |------|-------------|
-| `get_workspace_summary` | Outstanding total, overdue buckets, due-today count |
-| `list_invoices` | List invoices with filters (status, overdue, etc.) |
-| `upsert_invoices` | Create or update invoices from pasted data |
-| `create_followups` | Draft follow-up messages for overdue invoices |
-| `update_invoice_status` | Mark invoices as paid, promised, disputed, etc. |
+| `get_workspace_summary` | Today's date (IST), outstanding total, overdue buckets (1-30, 31-60, 60+ days) |
+| `list_invoices` | List invoices filtered by status, with days_overdue |
+| `upsert_invoices` | Create or update invoices (max 500 per workspace). Omitted fields are preserved on update |
+| `create_followups` | Draft follow-up messages (max 2000 per workspace). Skips paid invoices. Upserts on (invoice, date, channel) |
+| `update_invoice_status` | Mark invoices as paid, promised, disputed, or open. Paid auto-skips pending follow-ups |
+| `list_followups` | List follow-ups filtered by status and due date, with invoice details |
+| `update_followup_message` | Rewrite a draft follow-up message. Rejects edits to non-drafts |
 
-## Deploy on Vercel
+## Known Limitations
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+- **Token-in-URL auth** is a demo-stage choice. Production should use OAuth or signed tokens.
+- **No email/WhatsApp sending.** Follow-ups are drafted and approved in the UI; actual delivery is manual (WhatsApp click-to-send links are provided).
+- **Free-tier hosting.** Vercel Hobby plan limits cron jobs to one per day. Supabase free tier has row and bandwidth limits.
+- **Per-workspace caps.** 500 invoices and 2000 follow-ups per workspace to prevent runaway usage.
 
-Set the same environment variables in your Vercel project settings. Add `DEMO_MODE=true` if you want to hide token rotation and add a confirmation step before data reset.
+## Roadmap
+
+- OAuth-based MCP authentication
+- Automated email delivery via SendGrid/Resend
+- WhatsApp Business API integration
+- Multi-user workspaces with role-based access
+- Invoice PDF attachment support
+- Scheduled follow-up auto-send with approval queue
