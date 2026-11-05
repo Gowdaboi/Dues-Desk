@@ -1,8 +1,9 @@
 import { createSSRClient, getSessionUser, getWorkspaceForUser } from "@/lib/supabase-ssr";
 import { redirect } from "next/navigation";
-import { todayIST } from "@/lib/constants";
+import { todayIST, APP_URL } from "@/lib/constants";
 import { FollowupList } from "./followup-list";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { ConnectClaudeCard } from "@/components/connect-claude-card";
 
 export const instant = false;
 
@@ -28,6 +29,9 @@ export default async function FollowupsPage() {
 
   const today = todayIST();
 
+  const mcpUrl = `${APP_URL}/api/mcp/${workspace.mcp_token}`;
+  const hasFollowups = (followups?.length ?? 0) > 0;
+
   return (
     <div>
       <AutoRefresh intervalMs={5000} />
@@ -35,7 +39,11 @@ export default async function FollowupsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Follow-ups</h1>
         <p className="text-sm text-muted-foreground">Today: {today}</p>
       </div>
-      <FollowupList followups={followups ?? []} today={today} />
+      {hasFollowups ? (
+        <FollowupList followups={followups!} today={today} />
+      ) : (
+        <ConnectClaudeCard mcpUrl={mcpUrl} />
+      )}
     </div>
   );
 }

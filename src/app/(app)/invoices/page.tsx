@@ -1,7 +1,9 @@
 import { createSSRClient, getSessionUser, getWorkspaceForUser } from "@/lib/supabase-ssr";
 import { redirect } from "next/navigation";
+import { APP_URL } from "@/lib/constants";
 import { InvoiceTable } from "./invoice-table";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { ConnectClaudeCard } from "@/components/connect-claude-card";
 
 export const instant = false;
 
@@ -25,6 +27,9 @@ export default async function InvoicesPage() {
     .eq("workspace_id", workspace.id)
     .order("due_date", { ascending: true });
 
+  const mcpUrl = `${APP_URL}/api/mcp/${workspace.mcp_token}`;
+  const hasInvoices = (invoices?.length ?? 0) > 0;
+
   return (
     <div>
       <AutoRefresh intervalMs={5000} />
@@ -34,7 +39,11 @@ export default async function InvoicesPage() {
           {invoices?.length ?? 0} total
         </span>
       </div>
-      <InvoiceTable invoices={invoices ?? []} />
+      {hasInvoices ? (
+        <InvoiceTable invoices={invoices!} />
+      ) : (
+        <ConnectClaudeCard mcpUrl={mcpUrl} />
+      )}
     </div>
   );
 }
