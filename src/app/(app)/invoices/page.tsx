@@ -1,6 +1,7 @@
 import { createSSRClient, getSessionUser, getWorkspaceForUser } from "@/lib/supabase-ssr";
 import { redirect } from "next/navigation";
 import { InvoiceTable } from "./invoice-table";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export const instant = false;
 
@@ -26,6 +27,7 @@ export default async function InvoicesPage() {
 
   return (
     <div>
+      <AutoRefresh intervalMs={5000} />
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
         <span className="text-sm text-muted-foreground">

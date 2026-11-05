@@ -2,6 +2,7 @@ import { createSSRClient, getSessionUser, getWorkspaceForUser } from "@/lib/supa
 import { redirect } from "next/navigation";
 import { todayIST } from "@/lib/constants";
 import { FollowupList } from "./followup-list";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export const instant = false;
 
@@ -29,6 +30,7 @@ export default async function FollowupsPage() {
 
   return (
     <div>
+      <AutoRefresh intervalMs={5000} />
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Follow-ups</h1>
         <p className="text-sm text-muted-foreground">Today: {today}</p>
