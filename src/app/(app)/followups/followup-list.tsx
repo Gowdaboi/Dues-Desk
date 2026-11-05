@@ -51,7 +51,7 @@ function whatsappLink(phone: string | null, message: string) {
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
 }
 
-function FollowupCard({ followup, isDueToday }: { followup: Followup; isDueToday: boolean }) {
+function FollowupCard({ followup, isDueToday, today }: { followup: Followup; isDueToday: boolean; today: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(followup.message_text);
   const [pending, startTransition] = useTransition();
@@ -96,11 +96,16 @@ function FollowupCard({ followup, isDueToday }: { followup: Followup; isDueToday
             edited
           </span>
         )}
-        {isDueToday && (
-          <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-            DUE TODAY
-          </span>
-        )}
+        {isDueToday && (() => {
+          const overdueDays = Math.floor(
+            (new Date(today).getTime() - new Date(followup.send_on).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return (
+            <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+              {overdueDays > 0 ? `OVERDUE BY ${overdueDays}d` : "DUE TODAY"}
+            </span>
+          );
+        })()}
       </div>
 
       {editing ? (
@@ -232,7 +237,7 @@ export function FollowupList({
 
   const dueToday = followups.filter(
     (f) =>
-      f.send_on === today &&
+      f.send_on <= today &&
       (f.status === "draft" || f.status === "approved") &&
       f.invoices.status !== "paid" &&
       (!f.invoices.promised_date || f.invoices.promised_date < today)
@@ -252,7 +257,7 @@ export function FollowupList({
           </h2>
           <div className="space-y-3">
             {dueToday.map((f) => (
-              <FollowupCard key={f.id} followup={f} isDueToday />
+              <FollowupCard key={f.id} followup={f} isDueToday today={today} />
             ))}
           </div>
         </div>
@@ -285,7 +290,8 @@ export function FollowupList({
           <FollowupCard
             key={f.id}
             followup={f}
-            isDueToday={f.send_on === today}
+            isDueToday={f.send_on <= today}
+            today={today}
           />
         ))}
       </div>

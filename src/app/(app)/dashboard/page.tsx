@@ -57,13 +57,13 @@ export default async function DashboardPage() {
     else { buckets["60+"].count++; buckets["60+"].total += amt; }
   }
 
-  // Due Today: draft/approved followups due today, excluding paid invoices
-  // and invoices with a promised_date that hasn't passed yet
+  // Due Today: draft/approved followups due today or earlier, excluding paid
+  // invoices and invoices with a promised_date that hasn't passed yet
   const { count: dueTodayCount } = await supabase
     .from("followups")
     .select("id, invoices!inner(id)", { count: "exact", head: true })
     .eq("workspace_id", workspace.id)
-    .eq("send_on", today)
+    .lte("send_on", today)
     .in("status", ["draft", "approved"])
     .neq("invoices.status", "paid")
     .or(`promised_date.is.null,promised_date.lt.${today}`, { referencedTable: "invoices" });
