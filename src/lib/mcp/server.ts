@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { normalizePhone } from "../phone";
 import { APP_URL, todayIST } from "../constants";
+import { updateInvoiceStatus } from "../invoice-actions";
 
 function toolError(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], isError: true };
@@ -30,7 +31,7 @@ export function createDuesDeskMcp(
     "get_workspace_summary",
     {
       description:
-        "Returns today's date (IST), outstanding total, overdue buckets (1-30, 31-60, 60+ days) with counts and totals. Call this FIRST so you know today's date and what's owed.",
+        "Returns today's date (IST), outstanding total, overdue buckets (1-30, 31-60, 60+ days) with counts and totals. Call this FIRST so you know today's date and what's owed. Use outstanding_inr from this tool, do not sum invoices yourself.",
       inputSchema: z.object({}),
     },
     async () => {
@@ -91,7 +92,7 @@ export function createDuesDeskMcp(
     "list_invoices",
     {
       description:
-        "List invoices, optionally filtered by status (open, promised, paid, disputed). Returns invoice_no, customer, amount, due_date, status, and days_overdue.",
+        "List invoices, optionally filtered by status (open, promised, paid, disputed). Returns invoice_no, customer, amount, due_date, status, and days_overdue. Use outstanding_inr from get_workspace_summary for totals, do not sum invoices yourself.",
       inputSchema: z.object({
         status: z
           .enum(["open", "promised", "paid", "disputed"])
@@ -416,53 +417,27 @@ export function createDuesDeskMcp(
         return toolError(`Invoice ${invoice_no} not found.`);
       }
 
-      const updates: Record<string, unknown> = { status };
+      try {
+        const result = await updateInvoiceStatus(
+          db,
+          invoice.id,
+          workspaceId,
+          invoice.status,
+          status,
+          promised_date,
+          note ?? `Marked ${status} via MCP`
+        );
 
-      if (status === "paid") {
-        updates.paid_at = new Date().toISOString();
-        updates.promised_date = null;
-      } else if (status === "promised") {
-        updates.promised_date = promised_date;
-      } else {
-        // leaving promised → clear promised_date; leaving paid → clear paid_at
-        if (invoice.status === "promised") updates.promised_date = null;
-        if (invoice.status === "paid") updates.paid_at = null;
-      }
-
-      const { error: updateErr } = await db
-        .from("invoices")
-        .update(updates)
-        .eq("id", invoice.id);
-
-      if (updateErr) {
-        logErr("update_invoice_status:update", updateErr);
+        return toolJson({
+          invoice_no,
+          new_status: status,
+          followups_skipped: result.followupsSkipped,
+          invoice_url: `${APP_URL}/invoices`,
+        });
+      } catch (err) {
+        logErr("update_invoice_status:update", err);
         return toolError("Failed to update invoice. Try again.");
       }
-
-      let followupsSkipped = 0;
-      if (status === "paid") {
-        const { data: skipped } = await db
-          .from("followups")
-          .update({ status: "skipped" })
-          .eq("invoice_id", invoice.id)
-          .in("status", ["draft", "approved"])
-          .select("id");
-        followupsSkipped = skipped?.length ?? 0;
-      }
-
-      await db.from("events").insert({
-        workspace_id: workspaceId,
-        invoice_id: invoice.id,
-        type: `status_${status}`,
-        note: note ?? `Marked ${status} via MCP`,
-      });
-
-      return toolJson({
-        invoice_no,
-        new_status: status,
-        followups_skipped: followupsSkipped,
-        invoice_url: `${APP_URL}/invoices`,
-      });
     }
   );
 
