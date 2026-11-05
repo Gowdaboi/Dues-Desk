@@ -1,13 +1,14 @@
--- Run this in your Supabase SQL Editor after running the schema migration.
--- Step 1: Create a test user via Supabase Auth dashboard (email: test@duesdesk.com, password: testpass123)
--- Step 2: Get the user's UUID from the auth.users table
--- Step 3: Run this with that UUID:
+-- Run in Supabase SQL Editor after running schema migrations.
+--
+-- Step 1: Create a test user via Auth dashboard (any email/password)
+-- Step 2: Copy the user UUID from auth.users
+-- Step 3: Generate a token:  openssl rand -hex 32
+-- Step 4: Replace placeholders and run:
 
--- Replace YOUR_USER_UUID below with the actual UUID from auth.users
 INSERT INTO workspaces (name, mcp_token, owner_user_id)
 VALUES (
   'Demo Studio',
-  'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
-  'YOUR_USER_UUID'
+  '<openssl-rand-hex-32-output>',
+  '<user-uuid>'
 )
 ON CONFLICT DO NOTHING;

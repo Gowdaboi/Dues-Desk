@@ -7,46 +7,49 @@
 ## Setup Steps
 
 ### 1. Create Supabase tables
-Go to your Supabase project → SQL Editor → paste and run `supabase/migrations/001_schema.sql`.
+Go to your Supabase project → SQL Editor → paste and run both:
+- `supabase/migrations/001_schema.sql`
+- `supabase/migrations/002_followup_unique_paid_at.sql`
 
-### 2. Disable RLS temporarily (for MCP testing with service role)
-The MCP server uses the service-role key which bypasses RLS. No changes needed.
-
-### 3. Create a test user + workspace
-- Go to Authentication → Users → "Add user" → email: `test@duesdesk.com`, password: `testpass123`
+### 2. Create a test user + workspace
+- Go to Authentication → Users → "Add user" with any email/password you choose
 - Copy the user's UUID
-- Run in SQL Editor:
+- Generate a token:
+```bash
+openssl rand -hex 32
+```
+- Run in SQL Editor (replace placeholders):
 ```sql
 INSERT INTO workspaces (name, mcp_token, owner_user_id)
-VALUES ('Demo Studio', 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', '<paste-user-uuid>');
+VALUES ('Demo Studio', '<your-generated-token>', '<paste-user-uuid>');
 ```
 
-### 4. Configure env
+### 3. Configure env
 ```bash
 cp .env.local.example .env.local
 # Fill in your Supabase URL, anon key, and service role key
 ```
 
-### 5. Start the dev server
+### 4. Start the dev server
 ```bash
 npm run dev
 ```
 
-### 6. Test with MCP Inspector
+### 5. Test with MCP Inspector
 ```bash
 npx @modelcontextprotocol/inspector
 ```
 
 In the Inspector UI:
 - **Transport**: Streamable HTTP
-- **URL**: `http://localhost:3000/api/mcp/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6`
+- **URL**: `http://localhost:3000/api/mcp/<your-generated-token>`
 
-### 7. Test the tools
+### 6. Test the tools
 
 **get_workspace_summary** (no params):
 → Should return today's date in IST, zero outstanding
 
-**upsert_invoices**:
+**upsert_invoices** (run this twice to verify idempotency):
 ```json
 {
   "invoices": [
@@ -67,28 +70,8 @@ In the Inspector UI:
   ]
 }
 ```
-→ Should return `{ created: 2, updated: 0, invoices_url: "..." }`
-
-**get_workspace_summary** again:
-→ Should now show outstanding total and overdue buckets
-
-**list_invoices** `{ "status": "open" }`:
-→ Should list the two invoices with days_overdue
-
-**create_followups**:
-```json
-{
-  "items": [
-    {
-      "invoice_no": "INV-1041",
-      "send_on": "2026-11-06",
-      "channel": "whatsapp",
-      "tone": "friendly",
-      "message": "Hi Sharma Traders, just a gentle reminder about invoice INV-1041 for ₹48,000 that was due on 12 Oct. Would appreciate if you could process this at the earliest. Thanks!"
-    }
-  ]
-}
-```
+→ First run: `{ created: 2, updated: 0 }`
+→ Second run: `{ created: 0, updated: 2 }`
 
 **update_invoice_status**:
 ```json
@@ -98,4 +81,4 @@ In the Inspector UI:
   "note": "Paid via NEFT"
 }
 ```
-→ Follow-ups for INV-1041 should flip to "skipped"
+→ Follow-ups for INV-1041 should flip to "skipped", paid_at should be set
