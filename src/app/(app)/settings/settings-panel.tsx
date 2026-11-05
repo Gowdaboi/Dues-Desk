@@ -21,9 +21,11 @@ function escapeText(text: string): string {
 export function SettingsPanel({
   workspace,
   appUrl,
+  demoMode = false,
 }: {
   workspace: Workspace;
   appUrl: string;
+  demoMode?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -70,6 +72,8 @@ export function SettingsPanel({
   function handleReset() {
     if (!confirm("Delete ALL invoices, follow-ups, and events? This cannot be undone."))
       return;
+    if (demoMode && !confirm("Are you sure? This resets demo data for everyone."))
+      return;
     startTransition(async () => {
       await resetDemoData();
       router.refresh();
@@ -96,19 +100,21 @@ export function SettingsPanel({
         </div>
       </div>
 
-      <div className="rounded-xl border border-border p-6">
-        <h2 className="mb-1 text-lg font-semibold">Security</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Rotate your MCP token if it was compromised.
-        </p>
-        <button
-          onClick={handleRotate}
-          disabled={pending}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-        >
-          {pending ? "Rotating..." : "Rotate Token"}
-        </button>
-      </div>
+      {!demoMode && (
+        <div className="rounded-xl border border-border p-6">
+          <h2 className="mb-1 text-lg font-semibold">Security</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Rotate your MCP token if it was compromised.
+          </p>
+          <button
+            onClick={handleRotate}
+            disabled={pending}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {pending ? "Rotating..." : "Rotate Token"}
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-destructive/30 p-6">
         <h2 className="mb-1 text-lg font-semibold text-destructive">Danger Zone</h2>

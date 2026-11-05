@@ -13,7 +13,8 @@ export async function markInvoicePaid(
       paid_at: new Date().toISOString(),
       promised_date: null,
     })
-    .eq("id", invoiceId);
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId);
 
   if (updateErr) throw updateErr;
 
@@ -21,6 +22,7 @@ export async function markInvoicePaid(
     .from("followups")
     .update({ status: "skipped" })
     .eq("invoice_id", invoiceId)
+    .eq("workspace_id", workspaceId)
     .in("status", ["draft", "approved"])
     .select("id");
 
@@ -59,7 +61,8 @@ export async function updateInvoiceStatus(
   const { error } = await db
     .from("invoices")
     .update(updates)
-    .eq("id", invoiceId);
+    .eq("id", invoiceId)
+    .eq("workspace_id", workspaceId);
 
   if (error) throw error;
 

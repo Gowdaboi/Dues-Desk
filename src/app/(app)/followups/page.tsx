@@ -21,7 +21,7 @@ export default async function FollowupsPage() {
   const supabase = await createSSRClient();
   const { data: followups } = await supabase
     .from("followups")
-    .select("*, invoices!inner(invoice_no, customer_name, customer_phone, amount_inr)")
+    .select("*, invoices!inner(invoice_no, customer_name, customer_phone, amount_inr, status, promised_date)")
     .eq("workspace_id", workspace.id)
     .order("send_on", { ascending: true });
 

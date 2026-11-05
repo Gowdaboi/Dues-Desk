@@ -11,12 +11,15 @@ export default async function SettingsPage() {
 
   const workspace = await getWorkspaceForUser(user.id);
 
+  const demoMode = process.env.DEMO_MODE === "true";
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold tracking-tight">Settings</h1>
       <SettingsPanel
         workspace={workspace}
         appUrl={APP_URL}
+        demoMode={demoMode}
       />
     </div>
   );

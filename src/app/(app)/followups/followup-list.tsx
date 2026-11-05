@@ -17,6 +17,8 @@ type Followup = {
     customer_name: string;
     customer_phone: string | null;
     amount_inr: number;
+    status: string;
+    promised_date: string | null;
   };
 };
 
@@ -229,7 +231,11 @@ export function FollowupList({
   }
 
   const dueToday = followups.filter(
-    (f) => f.send_on === today && (f.status === "draft" || f.status === "approved")
+    (f) =>
+      f.send_on === today &&
+      (f.status === "draft" || f.status === "approved") &&
+      f.invoices.status !== "paid" &&
+      (!f.invoices.promised_date || f.invoices.promised_date < today)
   );
 
   const filtered =

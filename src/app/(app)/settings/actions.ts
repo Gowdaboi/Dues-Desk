@@ -14,6 +14,9 @@ async function requireWorkspace() {
 }
 
 export async function rotateToken() {
+  if (process.env.DEMO_MODE === "true") {
+    throw new Error("Token rotation is disabled in demo mode");
+  }
   const workspace = await requireWorkspace();
   const db = createServiceClient();
   const newToken = randomBytes(32).toString("hex");
@@ -32,9 +35,14 @@ export async function resetDemoData() {
   const workspace = await requireWorkspace();
   const db = createServiceClient();
 
-  await db.from("events").delete().eq("workspace_id", workspace.id);
-  await db.from("followups").delete().eq("workspace_id", workspace.id);
-  await db.from("invoices").delete().eq("workspace_id", workspace.id);
+  const { error: e1 } = await db.from("events").delete().eq("workspace_id", workspace.id);
+  if (e1) throw new Error(`Failed to delete events: ${e1.message}`);
+
+  const { error: e2 } = await db.from("followups").delete().eq("workspace_id", workspace.id);
+  if (e2) throw new Error(`Failed to delete follow-ups: ${e2.message}`);
+
+  const { error: e3 } = await db.from("invoices").delete().eq("workspace_id", workspace.id);
+  if (e3) throw new Error(`Failed to delete invoices: ${e3.message}`);
 
   revalidatePath("/invoices");
   revalidatePath("/followups");
