@@ -441,5 +441,175 @@ export function createDuesDeskMcp(
     }
   );
 
+  // ── Tool 6: list_followups ─────────────────────────────────────────
+  server.registerTool(
+    "list_followups",
+    {
+      description:
+        "List follow-up messages, optionally filtered by status or due date. Returns invoice_no, customer, amount, days_overdue, tone, send_on, channel, status, and message. To rank who to chase first, use amount_inr and days_overdue; do not sum amounts yourself.",
+      inputSchema: z.object({
+        status: z
+          .enum(["draft", "approved", "sent", "skipped"])
+          .describe("Filter by follow-up status")
+          .optional(),
+        due_by: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format")
+          .describe(
+            "Only return follow-ups with send_on on or before this date. Defaults to today."
+          )
+          .optional(),
+      }),
+    },
+    async ({ status, due_by }) => {
+      const cutoff = due_by ?? todayIST();
+
+      let query = db
+        .from("followups")
+        .select(
+          "send_on, channel, tone, status, message_text, invoices!inner(invoice_no, customer_name, amount_inr, due_date)"
+        )
+        .eq("workspace_id", workspaceId)
+        .lte("send_on", cutoff)
+        .order("send_on", { ascending: true });
+
+      if (status) {
+        query = query.eq("status", status);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        logErr("list_followups", error);
+        return toolError("Failed to list follow-ups. Try again.");
+      }
+
+      const today = todayIST();
+      const rows = (data ?? []).map((f) => {
+        const inv = f.invoices as unknown as {
+          invoice_no: string;
+          customer_name: string;
+          amount_inr: number;
+          due_date: string;
+        };
+        const diff = Math.floor(
+          (new Date(today).getTime() - new Date(inv.due_date).getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+        return {
+          invoice_no: inv.invoice_no,
+          customer_name: inv.customer_name,
+          amount_inr: inv.amount_inr,
+          days_overdue: diff > 0 ? diff : 0,
+          tone: f.tone,
+          send_on: f.send_on,
+          channel: f.channel,
+          status: f.status,
+          message: f.message_text,
+        };
+      });
+
+      return toolJson({
+        followups: rows,
+        followups_url: `${APP_URL}/followups`,
+      });
+    }
+  );
+
+  // ── Tool 7: update_followup_message ───────────────────────────────
+  server.registerTool(
+    "update_followup_message",
+    {
+      description:
+        "Rewrite a draft follow-up message. Only drafts can be edited — approved, sent, or skipped follow-ups are rejected. Identify the follow-up by invoice_no, send_on, and channel.",
+      inputSchema: z.object({
+        invoice_no: z
+          .string()
+          .min(1)
+          .describe("The invoice the follow-up belongs to"),
+        send_on: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format")
+          .describe("The scheduled send date of the follow-up to edit"),
+        channel: z
+          .enum(["whatsapp", "email"])
+          .describe("The channel of the follow-up to edit"),
+        message: z
+          .string()
+          .min(1)
+          .max(2000)
+          .describe(
+            "The new complete message text. No placeholders. Short and warm."
+          ),
+      }),
+    },
+    async ({ invoice_no, send_on, channel, message }) => {
+      const { data: invoice, error: invErr } = await db
+        .from("invoices")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("invoice_no", invoice_no)
+        .maybeSingle();
+
+      if (invErr) {
+        logErr("update_followup_message:invoice", invErr);
+        return toolError("Failed to look up invoice. Try again.");
+      }
+      if (!invoice) {
+        return toolError(`Invoice ${invoice_no} not found.`);
+      }
+
+      const { data: followup, error: fErr } = await db
+        .from("followups")
+        .select("id, status")
+        .eq("workspace_id", workspaceId)
+        .eq("invoice_id", invoice.id)
+        .eq("send_on", send_on)
+        .eq("channel", channel)
+        .maybeSingle();
+
+      if (fErr) {
+        logErr("update_followup_message:lookup", fErr);
+        return toolError("Failed to look up follow-up. Try again.");
+      }
+      if (!followup) {
+        return toolError(
+          `No ${channel} follow-up found for ${invoice_no} on ${send_on}.`
+        );
+      }
+      if (followup.status !== "draft") {
+        return toolError(
+          `Cannot edit a ${followup.status} follow-up. Only drafts can be changed.`
+        );
+      }
+
+      const { error: updateErr } = await db
+        .from("followups")
+        .update({ message_text: message, edited_by_human: false })
+        .eq("id", followup.id)
+        .eq("workspace_id", workspaceId);
+
+      if (updateErr) {
+        logErr("update_followup_message:update", updateErr);
+        return toolError("Failed to update follow-up message. Try again.");
+      }
+
+      await db.from("events").insert({
+        workspace_id: workspaceId,
+        invoice_id: invoice.id,
+        type: "followup_message_updated",
+        note: `${channel} follow-up for ${send_on} rewritten via MCP`,
+      });
+
+      return toolJson({
+        invoice_no,
+        send_on,
+        channel,
+        updated: true,
+        review_url: `${APP_URL}/followups`,
+      });
+    }
+  );
+
   return server;
 }
