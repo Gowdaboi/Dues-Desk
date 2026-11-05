@@ -191,6 +191,18 @@ export function createDuesDeskMcp(
       }),
     },
     async ({ invoices: items }) => {
+      const MAX_INVOICES = 500;
+      const { count: existing } = await db
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId);
+
+      if ((existing ?? 0) + items.length > MAX_INVOICES) {
+        return toolError(
+          `Workspace invoice limit is ${MAX_INVOICES}. You have ${existing ?? 0} and are trying to add ${items.length}. Delete some invoices first.`
+        );
+      }
+
       const rows = items.map((item) => ({
         workspace_id: workspaceId,
         invoice_no: item.invoice_no,
@@ -284,6 +296,18 @@ export function createDuesDeskMcp(
       }),
     },
     async ({ items }) => {
+      const MAX_FOLLOWUPS = 2000;
+      const { count: existing } = await db
+        .from("followups")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId);
+
+      if ((existing ?? 0) + items.length > MAX_FOLLOWUPS) {
+        return toolError(
+          `Workspace follow-up limit is ${MAX_FOLLOWUPS}. You have ${existing ?? 0} and are trying to add ${items.length}. Delete some follow-ups first.`
+        );
+      }
+
       let created = 0;
       const skippedPaid: string[] = [];
       const notFound: string[] = [];
