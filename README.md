@@ -1,6 +1,6 @@
 # Dues Desk
 
-A collections follow-up desk for Indian SMEs. Paste overdue invoices into Claude, get draft follow-up messages, then approve and send them via WhatsApp or email.
+A collections follow-up desk for Indian SMEs. Paste overdue invoices into Claude, get draft follow-up messages, then review, edit, approve and send them yourself via WhatsApp click-to-send.
 
 ## Architecture
 
@@ -85,7 +85,7 @@ Once connected, Claude has access to these tools:
 
 - **Token-in-URL auth** is a demo-stage choice. Production should use OAuth or signed tokens.
 - **No email/WhatsApp sending.** Follow-ups are drafted and approved in the UI; actual delivery is manual (WhatsApp click-to-send links are provided).
-- **Free-tier hosting.** Vercel Hobby plan limits cron jobs to one per day. Supabase free tier has row and bandwidth limits.
+- **Free-tier hosting.** A daily Vercel cron keeps the Supabase project from pausing; Supabase's free tier has database size and bandwidth limits.
 - **Per-workspace caps.** 500 invoices and 2000 follow-ups per workspace to prevent runaway usage.
 
 ## Roadmap

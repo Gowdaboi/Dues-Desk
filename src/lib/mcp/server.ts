@@ -258,7 +258,7 @@ export function createDuesDeskMcp(
     "create_followups",
     {
       description:
-        "Create follow-up messages for invoices. Saved as DRAFTS for human review — never sent automatically. Write the actual final message text: short, warm Indian business English, name the invoice number, amount (with ₹) and due date. No placeholders like [name] or {amount}. Escalate tone: friendly for early, firm for mid, final for very late. Invoices already marked paid are skipped and reported.",
+        "Create follow-up messages for invoices. Saved as DRAFTS for human review — never sent automatically. Write the actual final message text: short, warm Indian business English, name the invoice number, amount (with ₹) and due date. No placeholders like [name] or {amount}. Escalate tone: friendly for early, firm for mid, final for very late. Invoices already marked paid are skipped and reported. Messages are sent later than they are written, so never state how many days overdue something is; refer to the due date instead. Do not invent a sender name or sign-off, and do not imply legal action or other threats, even in a final notice.",
       inputSchema: z.object({
         items: z
           .array(
@@ -286,7 +286,7 @@ export function createDuesDeskMcp(
                 .min(1)
                 .max(2000)
                 .describe(
-                  "The complete, ready-to-send message. No placeholders. Short and warm."
+                  "The complete, ready-to-send message. No placeholders. Short and warm. Refer to the due date, never a day count. No sign-off name."
                 ),
             })
           )
@@ -545,7 +545,7 @@ export function createDuesDeskMcp(
     "update_followup_message",
     {
       description:
-        "Rewrite a draft follow-up message. Only drafts can be edited — approved, sent, or skipped follow-ups are rejected. Identify the follow-up by invoice_no, send_on, and channel.",
+        "Rewrite a draft follow-up message. Only drafts can be edited — approved, sent, or skipped follow-ups are rejected. Identify the follow-up by invoice_no, send_on, and channel. Refer to the due date, never a day count. No sign-off name. No threats.",
       inputSchema: z.object({
         invoice_no: z
           .string()
@@ -563,7 +563,7 @@ export function createDuesDeskMcp(
           .min(1)
           .max(2000)
           .describe(
-            "The new complete message text. No placeholders. Short and warm."
+            "The new complete message text. No placeholders. Short and warm. Refer to the due date, never a day count. No sign-off name."
           ),
       }),
     },
